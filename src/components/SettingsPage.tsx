@@ -27,6 +27,28 @@ export function SettingsPage() {
   const [isDownloading, setIsDownloading] = useState(false);
   const [downloadProgress, setDownloadProgress] = useState(0);
   const [downloadStatus, setDownloadStatus] = useState("");
+  const [isWhisperInstalled, setIsWhisperInstalled] = useState(false);
+  const [isGemmaInstalled, setIsGemmaInstalled] = useState(false);
+
+  const verifyModels = async () => {
+    if (whisperModelPath) {
+      const exists = await invoke<boolean>("check_model_exists", { path: whisperModelPath });
+      setIsWhisperInstalled(exists);
+    } else {
+      setIsWhisperInstalled(false);
+    }
+    
+    if (gemmaModelPath) {
+      const exists = await invoke<boolean>("check_model_exists", { path: gemmaModelPath });
+      setIsGemmaInstalled(exists);
+    } else {
+      setIsGemmaInstalled(false);
+    }
+  };
+
+  useEffect(() => {
+    verifyModels();
+  }, [whisperModelPath, gemmaModelPath]);
 
   useEffect(() => {
     let unlisten: () => void;
@@ -54,6 +76,7 @@ export function SettingsPage() {
       } else {
         setGemmaModelPath(path);
       }
+      await verifyModels();
       alert(`Successfully downloaded ${type} model to ${path}`);
     } catch (e) {
       alert(`Failed to download: ${e}`);
@@ -175,7 +198,13 @@ export function SettingsPage() {
                     <option value="base">Base (Moderate)</option>
                     <option value="small">Small (Slower, Higher Accuracy)</option>
                   </select>
-                  <Button onClick={() => handleDownload('whisper', whisperModel)}>Download</Button>
+                  <Button 
+                    onClick={() => handleDownload('whisper', whisperModel)}
+                    disabled={isDownloading || isWhisperInstalled}
+                    variant={isWhisperInstalled ? "outline" : "default"}
+                  >
+                    {isDownloading ? "Downloading..." : isWhisperInstalled ? "Installed" : "Download"}
+                  </Button>
                 </div>
                 <Input
                   id="whisper-model-path"
@@ -183,6 +212,7 @@ export function SettingsPage() {
                   placeholder="Or enter path to Whisper model"
                   value={whisperModelPath}
                   onChange={(e) => setWhisperModelPath(e.target.value)}
+                  disabled={isDownloading}
                 />
               </div>
 
@@ -192,11 +222,18 @@ export function SettingsPage() {
                   <select
                     value={gemmaModel}
                     onChange={(e) => setGemmaModel(e.target.value)}
+                    disabled={isDownloading}
                     className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     <option value="2b-it">2B-IT (General Purpose)</option>
                   </select>
-                  <Button onClick={() => handleDownload('gemma', gemmaModel)}>Download</Button>
+                  <Button 
+                    onClick={() => handleDownload('gemma', gemmaModel)}
+                    disabled={isDownloading || isGemmaInstalled}
+                    variant={isGemmaInstalled ? "outline" : "default"}
+                  >
+                    {isDownloading ? "Downloading..." : isGemmaInstalled ? "Installed" : "Download"}
+                  </Button>
                 </div>
                 <Input
                   id="gemma-model-path"
@@ -204,6 +241,7 @@ export function SettingsPage() {
                   placeholder="Or enter path to Gemma model"
                   value={gemmaModelPath}
                   onChange={(e) => setGemmaModelPath(e.target.value)}
+                  disabled={isDownloading}
                 />
               </div>
               
