@@ -1,10 +1,19 @@
 use tauri::{AppHandle, Manager, State};
 use std::path::PathBuf;
 use std::env;
+use tokio::fs::File;
+use tokio::io::AsyncWriteExt;
+use reqwest;
 
 mod audio;
 mod uploader;
 mod local_ai;
+
+#[derive(Clone, serde::Serialize)]
+struct DownloadProgress {
+    received: u64,
+    total: Option<u64>,
+}
 
 #[cfg(target_os = "macos")]
 mod native {
@@ -103,6 +112,34 @@ async fn stop_recording(app_handle: AppHandle, audio_buffer: State<'_, AudioBuff
     }
 }
 
+#[tauri::command]
+async fn download_model(app_handle: AppHandle, model_type: String, model_id: String) -> Result<(), String> {
+    let url = match model_type.as_str() {
+        "Whisper" => format!("https://huggingface.co/ggerganov/whisper.cpp/resolve/main/{}", model_id),
+        "Gemma" => format!("https://huggingface.co/google/gemma-2b/resolve/main/{}", model_id),
+        _ => return Err("Invalid model type".to_string()),
+    };
+
+    let app_data_dir = app_handle.path().app_data_dir().unwrap();
+    let model_dir = app_data_dir.join("models");
+    tokio::fs::create_dir_all(&model_dir).await.map_err(|e| e.to_string())?;
+    let model_path = model_dir.join(&model_id);
+
+    let mut response = reqwest::get(&url).await.map_err(|e| e.to_string())?;
+    let total = response.content_length();
+
+    let mut file = File::create(&model_path).await.map_err(|e| e.to_string())?;
+    let mut received = 0;
+
+    while let Some(chunk) = response.chunk().await.map_err(|e| e.to_string())? {
+        received += chunk.len() as u64;
+        file.write_all(&chunk).await.map_err(|e| e.to_string())?;
+        app_handle.emit("download-progress", DownloadProgress { received, total }).unwrap();
+    }
+
+    Ok(())
+}
+
 fn add_data(buffer: &AudioBuffer, data: &[f32]) {
     buffer.add_data(data);
 }
@@ -122,7 +159,7 @@ pub fn run() {
             app.manage(audio_buffer);
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![start_recording, stop_recording, debug_save_to_desktop])
+        .invoke_handler(tauri::generate_handler![start_recording, stop_recording, debug_save_to_desktop, download_model])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
