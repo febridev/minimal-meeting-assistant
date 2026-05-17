@@ -15,11 +15,17 @@ name = "app_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]
-tauri-build = { version = "2.0.0-rc.13" }
+tauri-build = { version = "2.0.0-rc.13", features = [] }
+swift-bridge-build = "0.1"
 
 [dependencies]
 serde_json = "1.0"
 serde = { version = "1.0", features = ["derive"] }
 log = "0.4"
-tauri = { version = "2.0.0-rc.17" }
+tauri = { version = "2.0.0-rc.17", features = [] }
 tauri-plugin-log = "2.0.0-rc"
+reqwest = { version = "0.11", features = ["multipart", "json"] }
+tokio = { version = "1", features = ["full"] }
+hound = "3.4"
+dirs = "5"
+swift-bridge = "0.1"

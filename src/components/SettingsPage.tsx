@@ -9,6 +9,14 @@ import { AboutSection } from "./AboutSection";
 
 export function SettingsPage() {
   const [activeSection, setActiveSection] = useState("general");
+  const [bitDepth, setBitDepth] = useState(() => {
+    return localStorage.getItem("audioBitDepth") || "32";
+  });
+
+  const handleSave = () => {
+    localStorage.setItem("audioBitDepth", bitDepth);
+    alert("Settings saved!");
+  };
 
   return (
     <div className="flex h-full bg-background">
@@ -52,7 +60,6 @@ export function SettingsPage() {
         </ul>
       </nav>
 
-
       {/* Main Content */}
       <main className="flex-1 p-6 overflow-hidden">
         {activeSection === "general" && (
@@ -66,18 +73,58 @@ export function SettingsPage() {
                 <Label htmlFor="path">Save Path</Label>
                 <Input id="path" placeholder="/Users/me/Documents/Recordings" />
               </div>
+              <div className="space-y-2 pt-2">
+                <Label>Recording Quality</Label>
+                <div className="flex gap-4 items-center">
+                  <div className="flex items-center gap-2">
+                    <input 
+                      type="radio" 
+                      id="32bit" 
+                      name="bitDepth" 
+                      value="32" 
+                      checked={bitDepth === "32"} 
+                      onChange={(e) => setBitDepth(e.target.value)}
+                      className="w-4 h-4 text-primary"
+                    />
+                    <Label htmlFor="32bit" className="font-normal">32-bit (High Fidelity)</Label>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <input 
+                      type="radio" 
+                      id="16bit" 
+                      name="bitDepth" 
+                      value="16" 
+                      checked={bitDepth === "16"} 
+                      onChange={(e) => setBitDepth(e.target.value)}
+                      className="w-4 h-4 text-primary"
+                    />
+                    <Label htmlFor="16bit" className="font-normal">16-bit (Standard)</Label>
+                  </div>
+                </div>
+                <p className="text-xs text-muted-foreground">Default is 32-bit for maximum clarity.</p>
+              </div>
             </div>
-            <Button className="w-full">Save Changes</Button>
+            <Button className="w-full" onClick={handleSave}>Save Changes</Button>
           </div>
         )}
 
         {activeSection === "ai" && (
           <div className="space-y-6">
             <div className="space-y-1">
+              <Label htmlFor="api-key">URL AI API </Label>
+              <Input id="api-key" type="text" placeholder="https://..." />
+              <p className="text-xs text-muted-foreground">
+                Put Your URL API Here.
+              </p>
+            </div>
+            <div className="space-y-1">
               <Label htmlFor="api-key">OpenAI API Key</Label>
               <Input id="api-key" type="password" placeholder="sk-..." />
-              <p className="text-xs text-muted-foreground">Your key is stored locally.</p>
+              <p className="text-xs text-muted-foreground">
+                Your key is stored locally.
+              </p>
             </div>
+
             <Button className="w-full">Save Changes</Button>
           </div>
         )}

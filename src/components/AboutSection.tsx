@@ -20,7 +20,9 @@ export function AboutSection() {
           </div>
           <div className="flex justify-between border-b pb-2">
             <span className="font-medium">Author</span>
-            <span className="text-muted-foreground">Invisible Assistant Team</span>
+            <span className="text-muted-foreground">
+              Invisible Assistant Team
+            </span>
           </div>
           <div className="flex justify-between border-b pb-2">
             <span className="font-medium">License</span>
@@ -28,7 +30,9 @@ export function AboutSection() {
           </div>
           <div className="pt-2">
             <p className="leading-relaxed">
-              A lightweight macOS assistant designed for seamless audio recording and AI-powered transcriptions/summaries of your meetings.
+              A lightweight macOS assistant designed for seamless audio
+              recording and AI-powered transcriptions/summaries of your
+              meetings.
             </p>
           </div>
         </CardContent>

@@ -35,14 +35,12 @@
     ]
   },
   "plugins": {
-    "fs": {
-      "scope": ["$DOCUMENT/*"]
-    },
-    "path": {
-      "scope": ["$DOCUMENT/*"]
-    },
+    "fs": {},
     "shell": {
-      "scope": ["$DOCUMENT/*"]
+      "allowlist": {
+        "all": false,
+        "open": true
+      }
     }
   }
 }
