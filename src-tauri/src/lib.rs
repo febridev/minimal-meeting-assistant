@@ -4,6 +4,7 @@ use std::env;
 
 mod audio;
 mod uploader;
+mod local_ai;
 
 #[cfg(target_os = "macos")]
 mod native {
@@ -85,18 +86,20 @@ async fn stop_recording(app_handle: AppHandle, audio_buffer: State<'_, AudioBuff
     audio_buffer.export_as_wav(&file_path, sample_rate, bit_depth)
         .map_err(|e| e.to_string())?;
 
-    // These should be securely stored or passed from the frontend
-    let api_key = "your_api_key";
-    let api_url = "your_api_url";
+    let whisper_model_path = std::path::PathBuf::from("models/ggml-small.bin");
+    let gemma_model_path = std::path::PathBuf::from("models/gemma-2b.safetensors");
 
-    match uploader::upload_to_9router(&file_path, api_key, api_url).await {
-        Ok(summary) => {
-            match uploader::save_summary(&summary) {
-                Ok(path) => Ok(format!("Summary saved to {}", path)),
-                Err(e) => Err(format!("Failed to save summary: {}", e)),
-            }
-        },
-        Err(e) => Err(format!("Upload failed: {}", e)),
+    let transcript = crate::local_ai::whisper::transcribe(&file_path, &whisper_model_path)
+        .map_err(|e| format!("Transcription failed: {}", e))?;
+    
+    let summary = crate::local_ai::gemma::summarize(&transcript, &gemma_model_path)
+        .map_err(|e| format!("Summarization failed: {}", e))?;
+
+    let md_content = format!("# Meeting Summary\n\n## Transcript\n{}\n\n## Summary\n{}", transcript, summary);
+
+    match crate::uploader::save_summary(&md_content) {
+        Ok(path) => Ok(format!("Summary saved to {}", path)),
+        Err(e) => Err(format!("Failed to save summary: {}", e)),
     }
 }
 
