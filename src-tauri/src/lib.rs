@@ -81,7 +81,13 @@ async fn debug_save_to_desktop(audio_buffer: State<'_, AudioBuffer>, bit_depth: 
 }
 
 #[tauri::command]
-async fn stop_recording(app_handle: AppHandle, audio_buffer: State<'_, AudioBuffer>, bit_depth: u16) -> Result<String, String> {
+async fn stop_recording(
+    app_handle: AppHandle, 
+    audio_buffer: State<'_, AudioBuffer>, 
+    bit_depth: u16,
+    whisper_path: String,
+    gemma_path: String
+) -> Result<String, String> {
     #[cfg(target_os = "macos")]
     unsafe {
         native::stop_capture();
@@ -90,13 +96,13 @@ async fn stop_recording(app_handle: AppHandle, audio_buffer: State<'_, AudioBuff
     let temp_dir = env::temp_dir();
     let file_path = temp_dir.join("recorded_audio.wav");
     
-    let sample_rate = 48000; 
+    let sample_rate = 16000; // Use 16kHz for Whisper
 
     audio_buffer.export_as_wav(&file_path, sample_rate, bit_depth)
         .map_err(|e| e.to_string())?;
 
-    let whisper_model_path = std::path::PathBuf::from("models/ggml-small.bin");
-    let gemma_model_path = std::path::PathBuf::from("models/gemma-2b.safetensors");
+    let whisper_model_path = std::path::PathBuf::from(whisper_path);
+    let gemma_model_path = std::path::PathBuf::from(gemma_path);
 
     let transcript = crate::local_ai::whisper::transcribe(&file_path, &whisper_model_path)
         .map_err(|e| format!("Transcription failed: {}", e))?;
@@ -113,21 +119,35 @@ async fn stop_recording(app_handle: AppHandle, audio_buffer: State<'_, AudioBuff
 }
 
 #[tauri::command]
-async fn download_model(app_handle: AppHandle, model_type: String, model_id: String) -> Result<(), String> {
-    let url = match model_type.as_str() {
-        "Whisper" => format!("https://huggingface.co/ggerganov/whisper.cpp/resolve/main/{}", model_id),
-        "Gemma" => format!("https://huggingface.co/google/gemma-2b/resolve/main/{}", model_id),
+async fn download_model(app_handle: AppHandle, model_type: String, model_id: String) -> Result<String, String> {
+    let model_type_lower = model_type.to_lowercase();
+    let url = match model_type_lower.as_str() {
+        "whisper" => format!("https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-{}.bin", model_id),
+        "gemma" => "https://huggingface.co/bartowski/gemma-2-2b-it-GGUF/resolve/main/gemma-2-2b-it-Q4_K_M.gguf".to_string(),
         _ => return Err("Invalid model type".to_string()),
     };
 
     let app_data_dir = app_handle.path().app_data_dir().unwrap();
     let model_dir = app_data_dir.join("models");
     tokio::fs::create_dir_all(&model_dir).await.map_err(|e| e.to_string())?;
-    let model_path = model_dir.join(&model_id);
+    
+    let filename = if model_type_lower == "whisper" { 
+        format!("ggml-{}.bin", model_id) 
+    } else { 
+        "gemma-2-2b-it-Q4_K_M.gguf".to_string() 
+    };
+    let model_path = model_dir.join(filename);
+
+    if model_path.exists() {
+        return Ok(model_path.to_string_lossy().to_string());
+    }
 
     let mut response = reqwest::get(&url).await.map_err(|e| e.to_string())?;
-    let total = response.content_length();
+    if !response.status().is_success() {
+        return Err(format!("Download failed with status: {}", response.status()));
+    }
 
+    let total = response.content_length();
     let mut file = File::create(&model_path).await.map_err(|e| e.to_string())?;
     let mut received = 0;
 
@@ -137,11 +157,16 @@ async fn download_model(app_handle: AppHandle, model_type: String, model_id: Str
         app_handle.emit("download-progress", DownloadProgress { received, total }).unwrap();
     }
 
-    Ok(())
+    Ok(model_path.to_string_lossy().to_string())
 }
 
 fn add_data(buffer: &AudioBuffer, data: &[f32]) {
     buffer.add_data(data);
+}
+
+#[tauri::command]
+fn check_model_exists(path: String) -> bool {
+    std::path::Path::new(&path).exists()
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -159,7 +184,7 @@ pub fn run() {
             app.manage(audio_buffer);
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![start_recording, stop_recording, debug_save_to_desktop, download_model])
+        .invoke_handler(tauri::generate_handler![start_recording, stop_recording, debug_save_to_desktop, download_model, check_model_exists])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
