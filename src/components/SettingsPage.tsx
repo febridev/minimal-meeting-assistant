@@ -1,9 +1,12 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import { Progress } from "@/components/ui/progress";
 import { Settings, Sparkles, Info } from "lucide-react";
 import { AboutSection } from "./AboutSection";
 
@@ -18,6 +21,47 @@ export function SettingsPage() {
   const [gemmaModelPath, setGemmaModelPath] = useState(
     () => localStorage.getItem("gemmaModelPath") || ""
   );
+
+  const [whisperModel, setWhisperModel] = useState("tiny");
+  const [gemmaModel, setGemmaModel] = useState("2b-it");
+  const [isDownloading, setIsDownloading] = useState(false);
+  const [downloadProgress, setDownloadProgress] = useState(0);
+  const [downloadStatus, setDownloadStatus] = useState("");
+
+  useEffect(() => {
+    let unlisten: () => void;
+    async function setup() {
+      unlisten = await listen<{ received: number; total: number }>("download-progress", (event) => {
+        const { received, total } = event.payload;
+        if (total) {
+          setDownloadProgress(Math.round((received / total) * 100));
+        }
+      });
+    }
+    setup();
+    return () => { if (unlisten) unlisten(); };
+  }, []);
+
+  const handleDownload = async (type: string, id: string) => {
+    setIsDownloading(true);
+    setDownloadProgress(0);
+    setDownloadStatus(`Downloading ${type} model...`);
+    
+    try {
+      const path = await invoke<string>("download_model", { modelType: type, modelId: id });
+      if (type === "whisper") {
+        setWhisperModelPath(path);
+      } else {
+        setGemmaModelPath(path);
+      }
+      alert(`Successfully downloaded ${type} model to ${path}`);
+    } catch (e) {
+      alert(`Failed to download: ${e}`);
+    } finally {
+      setIsDownloading(false);
+      setDownloadStatus("");
+    }
+  };
 
   const handleSave = () => {
     localStorage.setItem("audioBitDepth", bitDepth);
@@ -118,35 +162,61 @@ export function SettingsPage() {
 
         {activeSection === "ai" && (
           <div className="space-y-6">
-            <div className="space-y-1">
-              <Label htmlFor="whisper-model-path">Whisper Model Path</Label>
-              <Input
-                id="whisper-model-path"
-                type="text"
-                placeholder="Enter path to Whisper model"
-                value={whisperModelPath}
-                onChange={(e) => setWhisperModelPath(e.target.value)}
-              />
-              <p className="text-xs text-muted-foreground">
-                Path to your local Whisper model file.
-              </p>
-            </div>
-            <div className="space-y-1">
-              <Label htmlFor="gemma-model-path">Gemma Model Path</Label>
-              <Input
-                id="gemma-model-path"
-                type="text"
-                placeholder="Enter path to Gemma model"
-                value={gemmaModelPath}
-                onChange={(e) => setGemmaModelPath(e.target.value)}
-              />
-              <p className="text-xs text-muted-foreground">
-                Path to your local Gemma model file.
-              </p>
-            </div>
+            <Card className="p-4 space-y-4">
+              <div className="space-y-2">
+                <Label>Whisper Model</Label>
+                <div className="flex items-center gap-2">
+                  <select
+                    value={whisperModel}
+                    onChange={(e) => setWhisperModel(e.target.value)}
+                    className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    <option value="tiny">Tiny (Fastest, Lower Accuracy)</option>
+                    <option value="base">Base (Moderate)</option>
+                    <option value="small">Small (Slower, Higher Accuracy)</option>
+                  </select>
+                  <Button onClick={() => handleDownload('whisper', whisperModel)}>Download</Button>
+                </div>
+                <Input
+                  id="whisper-model-path"
+                  type="text"
+                  placeholder="Or enter path to Whisper model"
+                  value={whisperModelPath}
+                  onChange={(e) => setWhisperModelPath(e.target.value)}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label>Gemma Model</Label>
+                <div className="flex items-center gap-2">
+                  <select
+                    value={gemmaModel}
+                    onChange={(e) => setGemmaModel(e.target.value)}
+                    className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    <option value="2b-it">2B-IT (General Purpose)</option>
+                  </select>
+                  <Button onClick={() => handleDownload('gemma', gemmaModel)}>Download</Button>
+                </div>
+                <Input
+                  id="gemma-model-path"
+                  type="text"
+                  placeholder="Or enter path to Gemma model"
+                  value={gemmaModelPath}
+                  onChange={(e) => setGemmaModelPath(e.target.value)}
+                />
+              </div>
+              
+              {isDownloading && (
+                <div className="space-y-2">
+                  <p className="text-sm text-muted-foreground">{downloadStatus}</p>
+                  <Progress value={downloadProgress} />
+                </div>
+              )}
+            </Card>
 
             <Button className="w-full" onClick={handleSave}>
-              Save Changes
+              Save AI Configuration
             </Button>
           </div>
         )}
