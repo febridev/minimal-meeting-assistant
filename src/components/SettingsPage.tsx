@@ -12,9 +12,17 @@ export function SettingsPage() {
   const [bitDepth, setBitDepth] = useState(() => {
     return localStorage.getItem("audioBitDepth") || "32";
   });
+  const [whisperModelPath, setWhisperModelPath] = useState(
+    () => localStorage.getItem("whisperModelPath") || ""
+  );
+  const [gemmaModelPath, setGemmaModelPath] = useState(
+    () => localStorage.getItem("gemmaModelPath") || ""
+  );
 
   const handleSave = () => {
     localStorage.setItem("audioBitDepth", bitDepth);
+    localStorage.setItem("whisperModelPath", whisperModelPath);
+    localStorage.setItem("gemmaModelPath", gemmaModelPath);
     alert("Settings saved!");
   };
 
@@ -111,21 +119,35 @@ export function SettingsPage() {
         {activeSection === "ai" && (
           <div className="space-y-6">
             <div className="space-y-1">
-              <Label htmlFor="api-key">URL AI API </Label>
-              <Input id="api-key" type="text" placeholder="https://..." />
+              <Label htmlFor="whisper-model-path">Whisper Model Path</Label>
+              <Input
+                id="whisper-model-path"
+                type="text"
+                placeholder="Enter path to Whisper model"
+                value={whisperModelPath}
+                onChange={(e) => setWhisperModelPath(e.target.value)}
+              />
               <p className="text-xs text-muted-foreground">
-                Put Your URL API Here.
+                Path to your local Whisper model file.
               </p>
             </div>
             <div className="space-y-1">
-              <Label htmlFor="api-key">OpenAI API Key</Label>
-              <Input id="api-key" type="password" placeholder="sk-..." />
+              <Label htmlFor="gemma-model-path">Gemma Model Path</Label>
+              <Input
+                id="gemma-model-path"
+                type="text"
+                placeholder="Enter path to Gemma model"
+                value={gemmaModelPath}
+                onChange={(e) => setGemmaModelPath(e.target.value)}
+              />
               <p className="text-xs text-muted-foreground">
-                Your key is stored locally.
+                Path to your local Gemma model file.
               </p>
             </div>
 
-            <Button className="w-full">Save Changes</Button>
+            <Button className="w-full" onClick={handleSave}>
+              Save Changes
+            </Button>
           </div>
         )}
 
