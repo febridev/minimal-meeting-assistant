@@ -27,7 +27,15 @@ export function RecordPopup({ onOpenSettings }: { onOpenSettings: () => void }) 
         setStatus("Recording...");
       } else {
         const bitDepth = parseInt(localStorage.getItem("audioBitDepth") || "32");
-        const result = await invoke("stop_recording", { bitDepth });
+        const apiKey = localStorage.getItem("apiKey") || "";
+        const apiUrl = localStorage.getItem("apiUrl") || "";
+        const savePath = localStorage.getItem("savePath") || "";
+        const result = await invoke("stop_recording", { 
+          bitDepth, 
+          apiKey, 
+          apiUrl, 
+          savePath 
+        });
         setIsRecording(false);
         setStatus("Summary saved!");
         console.log(result);

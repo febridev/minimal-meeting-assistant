@@ -71,7 +71,14 @@ async fn debug_save_to_desktop(audio_buffer: State<'_, AudioBuffer>, bit_depth: 
 }
 
 #[tauri::command]
-async fn stop_recording(app_handle: AppHandle, audio_buffer: State<'_, AudioBuffer>, bit_depth: u16) -> Result<String, String> {
+async fn stop_recording(
+    _app_handle: AppHandle, 
+    audio_buffer: State<'_, AudioBuffer>, 
+    bit_depth: u16, 
+    api_key: String, 
+    api_url: String, 
+    save_path: String
+) -> Result<String, String> {
     #[cfg(target_os = "macos")]
     unsafe {
         native::stop_capture();
@@ -85,16 +92,11 @@ async fn stop_recording(app_handle: AppHandle, audio_buffer: State<'_, AudioBuff
     audio_buffer.export_as_wav(&file_path, sample_rate, bit_depth)
         .map_err(|e| e.to_string())?;
 
-    // These should be securely stored or passed from the frontend
-    let api_key = "your_api_key";
-    let api_url = "your_api_url";
-
-    match uploader::upload_to_9router(&file_path, api_key, api_url).await {
+    match uploader::upload_to_9router(&file_path, &api_key, &api_url).await {
         Ok(summary) => {
-            match uploader::save_summary(&summary) {
-                Ok(path) => Ok(format!("Summary saved to {}", path)),
-                Err(e) => Err(format!("Failed to save summary: {}", e)),
-            }
+            let summary_path = uploader::save_summary(&summary, Some(&save_path))
+                .map_err(|e| e.to_string())?;
+            Ok(format!("Summary saved to {}", summary_path))
         },
         Err(e) => Err(format!("Upload failed: {}", e)),
     }

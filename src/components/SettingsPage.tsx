@@ -12,9 +12,21 @@ export function SettingsPage() {
   const [bitDepth, setBitDepth] = useState(() => {
     return localStorage.getItem("audioBitDepth") || "32";
   });
+  const [apiUrl, setApiUrl] = useState(() => {
+    return localStorage.getItem("apiUrl") || "";
+  });
+  const [apiKey, setApiKey] = useState(() => {
+    return localStorage.getItem("apiKey") || "";
+  });
+  const [savePath, setSavePath] = useState(() => {
+    return localStorage.getItem("savePath") || "";
+  });
 
   const handleSave = () => {
     localStorage.setItem("audioBitDepth", bitDepth);
+    localStorage.setItem("apiUrl", apiUrl);
+    localStorage.setItem("apiKey", apiKey);
+    localStorage.setItem("savePath", savePath);
     alert("Settings saved!");
   };
 
@@ -71,7 +83,12 @@ export function SettingsPage() {
               </div>
               <div className="space-y-1">
                 <Label htmlFor="path">Save Path</Label>
-                <Input id="path" placeholder="/Users/me/Documents/Recordings" />
+                <Input 
+                  id="path" 
+                  placeholder="/Users/me/Documents/Recordings" 
+                  value={savePath} 
+                  onChange={(e) => setSavePath(e.target.value)} 
+                />
               </div>
               <div className="space-y-2 pt-2">
                 <Label>Recording Quality</Label>
@@ -111,21 +128,33 @@ export function SettingsPage() {
         {activeSection === "ai" && (
           <div className="space-y-6">
             <div className="space-y-1">
-              <Label htmlFor="api-key">URL AI API </Label>
-              <Input id="api-key" type="text" placeholder="https://..." />
+              <Label htmlFor="api-url">URL AI API </Label>
+              <Input 
+                id="api-url" 
+                type="text" 
+                placeholder="https://..." 
+                value={apiUrl} 
+                onChange={(e) => setApiUrl(e.target.value)} 
+              />
               <p className="text-xs text-muted-foreground">
                 Put Your URL API Here.
               </p>
             </div>
             <div className="space-y-1">
               <Label htmlFor="api-key">OpenAI API Key</Label>
-              <Input id="api-key" type="password" placeholder="sk-..." />
+              <Input 
+                id="api-key" 
+                type="password" 
+                placeholder="sk-..." 
+                value={apiKey} 
+                onChange={(e) => setApiKey(e.target.value)} 
+              />
               <p className="text-xs text-muted-foreground">
                 Your key is stored locally.
               </p>
             </div>
 
-            <Button className="w-full">Save Changes</Button>
+            <Button className="w-full" onClick={handleSave}>Save Changes</Button>
           </div>
         )}
 
