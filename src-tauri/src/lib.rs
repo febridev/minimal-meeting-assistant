@@ -1,4 +1,4 @@
-use tauri::{AppHandle, Manager, State};
+use tauri::{AppHandle, Manager, State, Emitter};
 use std::path::PathBuf;
 use std::env;
 use tokio::fs::File;
