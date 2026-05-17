@@ -71,3 +71,48 @@ export default defineConfig([
   },
 ])
 ```
+
+## Getting Started
+
+- **Prerequisites**
+  - Node ≥ 18
+  - npm ≥ 9
+
+- **Installation**
+  ```bash
+  git clone https://github.com/your-org/mini_assistant-record-feature.git
+  cd mini_assistant-record-feature
+  npm install
+  ```
+
+- **Run the development server**
+  ```bash
+  npm run dev
+  ```
+
+- **Build for production**
+  ```bash
+  npm run build
+  ```
+
+## Scripts Overview
+
+| Script | Description |
+|--------|-------------|
+| `npm run dev` | Starts Vite with HMR |
+| `npm run build` | Builds production bundles to `dist/` |
+| `npm test` | Runs lint & tests |
+| `npm run lint` | Lints code with type‑aware rules |
+| `npm run fmt` | Auto‑formats code |
+
+## Directory Overview
+
+- `src/` – React source (`*.tsx`, `*.ts`)
+- `src-tauri/` – Tauri backend (if used)
+- `public/` – static assets
+- `package.json` – scripts & dependencies
+- `vite.config.ts` – Vite configuration
+
+---
+
+*Optional: add badges, environment‑variable notes, or documentation links as desired.*
