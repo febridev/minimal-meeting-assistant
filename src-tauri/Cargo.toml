@@ -30,8 +30,9 @@ hound = "3.4"
 dirs = "5"
 swift-bridge = "0.1"
 whisper-rs = "0.10"
-candle-core = "0.4"
-candle-transformers = "0.4"
-candle-nn = "0.4"
+candle-core = { version = "0.4", default-features = false }
+candle-transformers = { version = "0.4", default-features = false }
+candle-nn = { version = "0.4", default-features = false }
+rand = "=0.8.6"
 anyhow = "1.0"
 tokenizers = "0.15"
