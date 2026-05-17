@@ -36,3 +36,4 @@ candle-nn = { version = "0.4", default-features = false }
 rand = "=0.8.6"
 anyhow = "1.0"
 tokenizers = "0.15"
+futures-util = "0.3"
