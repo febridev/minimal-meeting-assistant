@@ -83,21 +83,13 @@ async fn debug_save_to_desktop(audio_buffer: State<'_, AudioBuffer>, bit_depth: 
 
 #[tauri::command]
 async fn stop_recording(
-    _app_handle: AppHandle, 
-    audio_buffer: State<'_, AudioBuffer>, 
-    bit_depth: u16,
-    whisper_path: String,
-    gemma_path: String
+    audio_buffer: State<'_, AudioBuffer>
 ) -> Result<String, String> {
-    println!("DEBUG: [BREADCRUMB 1] stop_recording entry");
     #[cfg(target_os = "macos")]
     unsafe {
-        println!("DEBUG: [BREADCRUMB 2] calling native::stop_capture");
         native::stop_capture();
-        println!("DEBUG: [BREADCRUMB 3] native::stop_capture returned");
     }
 
-    println!("DEBUG: [BREADCRUMB 4] waiting for capture to flush");
     tokio::time::sleep(std::time::Duration::from_millis(500)).await;
 
     let temp_dir = env::temp_dir();
@@ -105,63 +97,56 @@ async fn stop_recording(
     
     let sample_rate = 16000; 
 
-    println!("DEBUG: [BREADCRUMB 5] exporting to WAV");
-    audio_buffer.export_as_wav(&file_path, sample_rate, bit_depth)
-        .map_err(|e| {
-            println!("ERROR: WAV export failed: {}", e);
-            e.to_string()
-        })?;
-
-    let whisper_model_path = std::path::PathBuf::from(whisper_path);
-    let gemma_model_path = std::path::PathBuf::from(gemma_path);
-
-    println!("DEBUG: [BREADCRUMB 6] starting transcription (blocking)");
-    let file_path_clone = file_path.clone();
-    let transcript = tokio::task::spawn_blocking(move || {
-        println!("DEBUG: [BREADCRUMB 7] inside whisper thread");
-        crate::local_ai::whisper::transcribe(&file_path_clone, &whisper_model_path)
-    }).await.map_err(|e| {
-        println!("ERROR: Whisper task panicked: {}", e);
-        e.to_string()
-    })?
-    .map_err(|e| {
-        println!("ERROR: Whisper error: {}", e);
-        format!("Transcription failed: {}", e)
-    })?;
-    
-    println!("DEBUG: [BREADCRUMB 8] transcription complete");
-    
-    println!("DEBUG: [BREADCRUMB 9] starting summarization (blocking)");
-    let transcript_for_summary = transcript.clone();
-    let summary = tokio::task::spawn_blocking(move || {
-        println!("DEBUG: [BREADCRUMB 10] inside gemma thread");
-        crate::local_ai::gemma::summarize(&transcript_for_summary, &gemma_model_path)
-    }).await.map_err(|e| {
-        println!("ERROR: Gemma task panicked: {}", e);
-        e.to_string()
-    })?
-    .map_err(|e| {
-        println!("ERROR: Gemma error: {}", e);
-        format!("Summarization failed: {}", e)
-    })?;
-
-    println!("[BREADCRUMB 11] summarization complete");
-
-    let md_content = format!("# Meeting Summary\n\n## Transcript\n{}\n\n## Summary\n{}", transcript, summary);
+    audio_buffer.export_as_wav(&file_path, sample_rate, 16)
+        .map_err(|e| e.to_string())?;
 
     audio_buffer.clear();
 
-    println!("[BREADCRUMB 12] saving summary");
-    match crate::uploader::save_summary(&md_content) {
-        Ok(path) => {
-            println!("DEBUG: Saved to {}", path);
-            Ok(format!("Summary saved to {}", path))
-        },
-        Err(e) => {
-            println!("ERROR: Save failed: {}", e);
-            Err(format!("Failed to save summary: {}", e))
-        }
+    Ok(file_path.to_string_lossy().to_string())
+}
+
+#[tauri::command]
+async fn process_audio(
+    app_handle: AppHandle,
+    file_path: String,
+    whisper_path: String,
+    gemma_path: String,
+) -> Result<String, String> {
+    let _ = app_handle.emit("processing-status", "Transcribing with Whisper...");
+
+    let file_path_buf = PathBuf::from(file_path);
+    let whisper_model_path = PathBuf::from(whisper_path);
+    let file_path_clone = file_path_buf.clone();
+    let transcript = tokio::task::spawn_blocking(move || {
+        crate::local_ai::whisper::transcribe(&file_path_clone, &whisper_model_path)
+    })
+    .await
+    .map_err(|e| e.to_string())?
+    .map_err(|e| format!("Transcription failed: {}", e))?;
+
+    let _ = app_handle.emit("processing-status", "Summarizing with Gemma...");
+    
+    let gemma_model_path = PathBuf::from(gemma_path);
+    let transcript_clone = transcript.clone();
+    let summary = tokio::task::spawn_blocking(move || {
+        crate::local_ai::gemma::summarize(&transcript_clone, &gemma_model_path)
+    })
+    .await
+    .map_err(|e| e.to_string())?
+    .map_err(|e| format!("Summarization failed: {}", e))?;
+
+    let md_content = format!("# Meeting Summary\n\n## Transcript\n{}\n\n## Summary\n{}", transcript, summary);
+
+    let result = match crate::uploader::save_summary(&md_content) {
+        Ok(path) => Ok(format!("Summary saved to {}", path)),
+        Err(e) => Err(format!("Failed to save summary: {}", e)),
+    };
+
+    if result.is_ok() {
+        let _ = tokio::fs::remove_file(file_path_buf).await;
     }
+
+    result
 }
 
 #[tauri::command]
@@ -173,7 +158,7 @@ async fn download_model(app_handle: AppHandle, model_type: String, model_id: Str
         _ => return Err("Invalid model type".to_string()),
     };
 
-    let app_data_dir = app_handle.path().app_data_dir().unwrap();
+    let app_data_dir = app_handle.path().app_data_dir().map_err(|e| e.to_string())?;
     let model_dir = app_data_dir.join("models");
     tokio::fs::create_dir_all(&model_dir).await.map_err(|e| e.to_string())?;
     
@@ -200,7 +185,7 @@ async fn download_model(app_handle: AppHandle, model_type: String, model_id: Str
     while let Some(chunk) = response.chunk().await.map_err(|e| e.to_string())? {
         received += chunk.len() as u64;
         file.write_all(&chunk).await.map_err(|e| e.to_string())?;
-        app_handle.emit("download-progress", DownloadProgress { received, total }).unwrap();
+        let _ = app_handle.emit("download-progress", DownloadProgress { received, total });
     }
 
     Ok(model_path.to_string_lossy().to_string())
@@ -229,7 +214,7 @@ pub fn run() {
             app.manage(audio_buffer);
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![start_recording, stop_recording, debug_save_to_desktop, download_model, check_model_exists])
+        .invoke_handler(tauri::generate_handler![start_recording, stop_recording, process_audio, debug_save_to_desktop, download_model, check_model_exists])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
