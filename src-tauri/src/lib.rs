@@ -74,6 +74,7 @@ async fn debug_save_to_desktop(audio_buffer: State<'_, AudioBuffer>, bit_depth: 
 
     audio_buffer.export_as_wav(&file_path, sample_rate, bit_depth)
         .map_err(|e| e.to_string())?;
+    tokio::time::sleep(std::time::Duration::from_millis(500)).await;
 
     audio_buffer.clear();
 
@@ -82,39 +83,85 @@ async fn debug_save_to_desktop(audio_buffer: State<'_, AudioBuffer>, bit_depth: 
 
 #[tauri::command]
 async fn stop_recording(
-    app_handle: AppHandle, 
+    _app_handle: AppHandle, 
     audio_buffer: State<'_, AudioBuffer>, 
     bit_depth: u16,
     whisper_path: String,
     gemma_path: String
 ) -> Result<String, String> {
+    println!("DEBUG: stop_recording called");
     #[cfg(target_os = "macos")]
     unsafe {
+        println!("DEBUG: Calling native::stop_capture");
         native::stop_capture();
     }
 
+    println!("DEBUG: Waiting for capture to flush (500ms)");
+    tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+
     let temp_dir = env::temp_dir();
     let file_path = temp_dir.join("recorded_audio.wav");
+    println!("DEBUG: Temporary WAV path: {:?}", file_path);
     
-    let sample_rate = 16000; // Use 16kHz for Whisper
+    let sample_rate = 16000; 
 
+    println!("DEBUG: Exporting to WAV at 16kHz...");
     audio_buffer.export_as_wav(&file_path, sample_rate, bit_depth)
-        .map_err(|e| e.to_string())?;
+        .map_err(|e| {
+            println!("ERROR: WAV export failed: {}", e);
+            e.to_string()
+        })?;
 
     let whisper_model_path = std::path::PathBuf::from(whisper_path);
     let gemma_model_path = std::path::PathBuf::from(gemma_path);
 
-    let transcript = crate::local_ai::whisper::transcribe(&file_path, &whisper_model_path)
-        .map_err(|e| format!("Transcription failed: {}", e))?;
+    println!("DEBUG: Starting transcription (blocking task)");
+    let file_path_clone = file_path.clone();
+    let transcript = tokio::task::spawn_blocking(move || {
+        println!("DEBUG: Inside Whisper thread");
+        crate::local_ai::whisper::transcribe(&file_path_clone, &whisper_model_path)
+    }).await.map_err(|e| {
+        println!("ERROR: Whisper task panicked: {}", e);
+        e.to_string()
+    })?
+    .map_err(|e| {
+        println!("ERROR: Whisper error: {}", e);
+        format!("Transcription failed: {}", e)
+    })?;
     
-    let summary = crate::local_ai::gemma::summarize(&transcript, &gemma_model_path)
-        .map_err(|e| format!("Summarization failed: {}", e))?;
+    println!("DEBUG: Transcription success. Length: {}", transcript.len());
+    
+    println!("DEBUG: Starting summarization (blocking task)");
+    let transcript_for_summary = transcript.clone();
+    let summary = tokio::task::spawn_blocking(move || {
+        println!("DEBUG: Inside Gemma thread");
+        crate::local_ai::gemma::summarize(&transcript_for_summary, &gemma_model_path)
+    }).await.map_err(|e| {
+        println!("ERROR: Gemma task panicked: {}", e);
+        e.to_string()
+    })?
+    .map_err(|e| {
+        println!("ERROR: Gemma error: {}", e);
+        format!("Summarization failed: {}", e)
+    })?;
+
+    println!("DEBUG: Summarization success. Length: {}", summary.len());
 
     let md_content = format!("# Meeting Summary\n\n## Transcript\n{}\n\n## Summary\n{}", transcript, summary);
 
+    println!("DEBUG: Clearing audio buffer");
+    audio_buffer.clear();
+
+    println!("DEBUG: Saving summary Markdown");
     match crate::uploader::save_summary(&md_content) {
-        Ok(path) => Ok(format!("Summary saved to {}", path)),
-        Err(e) => Err(format!("Failed to save summary: {}", e)),
+        Ok(path) => {
+            println!("DEBUG: Saved to {}", path);
+            Ok(format!("Summary saved to {}", path))
+        },
+        Err(e) => {
+            println!("ERROR: Save failed: {}", e);
+            Err(format!("Failed to save summary: {}", e))
+        }
     }
 }
 
@@ -158,10 +205,6 @@ async fn download_model(app_handle: AppHandle, model_type: String, model_id: Str
     }
 
     Ok(model_path.to_string_lossy().to_string())
-}
-
-fn add_data(buffer: &AudioBuffer, data: &[f32]) {
-    buffer.add_data(data);
 }
 
 #[tauri::command]
