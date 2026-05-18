@@ -89,23 +89,23 @@ async fn stop_recording(
     whisper_path: String,
     gemma_path: String
 ) -> Result<String, String> {
-    println!("DEBUG: stop_recording called");
+    println!("DEBUG: [BREADCRUMB 1] stop_recording entry");
     #[cfg(target_os = "macos")]
     unsafe {
-        println!("DEBUG: Calling native::stop_capture");
+        println!("DEBUG: [BREADCRUMB 2] calling native::stop_capture");
         native::stop_capture();
+        println!("DEBUG: [BREADCRUMB 3] native::stop_capture returned");
     }
 
-    println!("DEBUG: Waiting for capture to flush (500ms)");
+    println!("DEBUG: [BREADCRUMB 4] waiting for capture to flush");
     tokio::time::sleep(std::time::Duration::from_millis(500)).await;
 
     let temp_dir = env::temp_dir();
     let file_path = temp_dir.join("recorded_audio.wav");
-    println!("DEBUG: Temporary WAV path: {:?}", file_path);
     
     let sample_rate = 16000; 
 
-    println!("DEBUG: Exporting to WAV at 16kHz...");
+    println!("DEBUG: [BREADCRUMB 5] exporting to WAV");
     audio_buffer.export_as_wav(&file_path, sample_rate, bit_depth)
         .map_err(|e| {
             println!("ERROR: WAV export failed: {}", e);
@@ -115,10 +115,10 @@ async fn stop_recording(
     let whisper_model_path = std::path::PathBuf::from(whisper_path);
     let gemma_model_path = std::path::PathBuf::from(gemma_path);
 
-    println!("DEBUG: Starting transcription (blocking task)");
+    println!("DEBUG: [BREADCRUMB 6] starting transcription (blocking)");
     let file_path_clone = file_path.clone();
     let transcript = tokio::task::spawn_blocking(move || {
-        println!("DEBUG: Inside Whisper thread");
+        println!("DEBUG: [BREADCRUMB 7] inside whisper thread");
         crate::local_ai::whisper::transcribe(&file_path_clone, &whisper_model_path)
     }).await.map_err(|e| {
         println!("ERROR: Whisper task panicked: {}", e);
@@ -129,12 +129,12 @@ async fn stop_recording(
         format!("Transcription failed: {}", e)
     })?;
     
-    println!("DEBUG: Transcription success. Length: {}", transcript.len());
+    println!("DEBUG: [BREADCRUMB 8] transcription complete");
     
-    println!("DEBUG: Starting summarization (blocking task)");
+    println!("DEBUG: [BREADCRUMB 9] starting summarization (blocking)");
     let transcript_for_summary = transcript.clone();
     let summary = tokio::task::spawn_blocking(move || {
-        println!("DEBUG: Inside Gemma thread");
+        println!("DEBUG: [BREADCRUMB 10] inside gemma thread");
         crate::local_ai::gemma::summarize(&transcript_for_summary, &gemma_model_path)
     }).await.map_err(|e| {
         println!("ERROR: Gemma task panicked: {}", e);
@@ -145,14 +145,13 @@ async fn stop_recording(
         format!("Summarization failed: {}", e)
     })?;
 
-    println!("DEBUG: Summarization success. Length: {}", summary.len());
+    println!("[BREADCRUMB 11] summarization complete");
 
     let md_content = format!("# Meeting Summary\n\n## Transcript\n{}\n\n## Summary\n{}", transcript, summary);
 
-    println!("DEBUG: Clearing audio buffer");
     audio_buffer.clear();
 
-    println!("DEBUG: Saving summary Markdown");
+    println!("[BREADCRUMB 12] saving summary");
     match crate::uploader::save_summary(&md_content) {
         Ok(path) => {
             println!("DEBUG: Saved to {}", path);
