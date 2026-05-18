@@ -5,7 +5,10 @@ use anyhow::Result;
 pub fn transcribe(audio_path: &Path, model_path: &Path) -> Result<String> {
     // Load whisper context
     let path_str = model_path.to_str().ok_or_else(|| anyhow::anyhow!("Invalid model path"))?;
-    let ctx = WhisperContext::new_with_params(path_str, WhisperContextParameters::default()).map_err(|e| anyhow::anyhow!("Failed to load context: {}", e))?;
+    let mut params = WhisperContextParameters::default();
+    params.use_gpu(true);
+    let ctx = WhisperContext::new_with_params(path_str, params)
+        .map_err(|e| anyhow::anyhow!("Failed to load context: {}", e))?;
     let mut state = ctx.create_state().map_err(|e| anyhow::anyhow!("Failed to create state: {}", e))?;
 
     // Load audio
