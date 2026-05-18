@@ -50,11 +50,14 @@ pub fn transcribe(audio_path: &Path, model_path: &Path) -> Result<String> {
     params.set_language(Some("auto"));
 
     // Run inference
-    println!("DEBUG: Starting Whisper inference with {} samples", audio_samples.len());
+    println!("DEBUG: Starting Whisper inference with {} samples (Metal GPU config applied if available)", audio_samples.len());
     let res = state.full(params, &audio_samples);
-    println!("DEBUG: Whisper inference result: {:?}", res);
-    res.map_err(|e| anyhow::anyhow!("Failed to run inference: {}", e))?;
-    println!("DEBUG: Whisper inference completed");
+    if let Err(e) = &res {
+        eprintln!("ERROR: Whisper inference failed. If using Metal, ensure GPU limits are not exceeded. Details: {:?}", e);
+    } else {
+        println!("DEBUG: Whisper inference completed successfully.");
+    }
+    res.map_err(|e| anyhow::anyhow!("Failed to run Whisper full inference (possible Metal error): {:?}", e))?;
 
     let num_segments = state.full_n_segments().map_err(|e| anyhow::anyhow!("Failed to get segment count: {}", e))?;
     let mut transcript = String::new();
