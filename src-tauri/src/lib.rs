@@ -6,9 +6,12 @@ use tokio::fs::File;
 use tokio::io::AsyncWriteExt;
 use reqwest;
 
+use whisper_state::WhisperStateContainer;
+
 mod audio;
 mod uploader;
 mod local_ai;
+mod whisper_state;
 
 #[derive(Clone, serde::Serialize)]
 struct DownloadProgress {
@@ -139,6 +142,15 @@ async fn stop_recording(
 }
 
 #[tauri::command]
+async fn initialize_whisper(
+    whisper_state: State<'_, WhisperStateContainer>,
+    path: String,
+) -> Result<(), String> {
+    println!("Initializing Whisper with model at: {}", path);
+    whisper_state.initialize(std::path::Path::new(&path))
+}
+
+#[tauri::command]
 async fn process_audio(
     app_handle: AppHandle,
     file_path: String,
@@ -243,9 +255,10 @@ pub fn run() {
             )?;
             let audio_buffer = AudioBuffer::new();
             app.manage(audio_buffer);
+            app.manage(WhisperStateContainer::new());
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![start_recording, stop_recording, process_audio, debug_save_to_desktop, download_model, check_model_exists])
+        .invoke_handler(tauri::generate_handler![start_recording, stop_recording, process_audio, debug_save_to_desktop, download_model, check_model_exists, initialize_whisper])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
