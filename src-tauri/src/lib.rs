@@ -50,6 +50,10 @@ impl AudioBuffer {
         self.0.export_as_wav(path, sample_rate, bits)
     }
 
+    fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
+
     fn clear(&self) {
         self.0.clear();
     }
@@ -83,7 +87,9 @@ async fn debug_save_to_desktop(audio_buffer: State<'_, AudioBuffer>, bit_depth: 
 
 #[tauri::command]
 async fn stop_recording(
-    audio_buffer: State<'_, AudioBuffer>
+    audio_buffer: State<'_, AudioBuffer>,
+    bit_depth: u16,
+    save_path: Option<String>,
 ) -> Result<String, String> {
     #[cfg(target_os = "macos")]
     unsafe {
@@ -92,12 +98,23 @@ async fn stop_recording(
 
     tokio::time::sleep(std::time::Duration::from_millis(500)).await;
 
-    let temp_dir = env::temp_dir();
-    let file_path = temp_dir.join("recorded_audio.wav");
+    if audio_buffer.is_empty() {
+        return Err("No audio was captured. Please ensure your microphone is working and you've granted necessary permissions.".to_string());
+    }
     
-    let sample_rate = 16000; 
+    let file_path = save_path.map(PathBuf::from).or_else(|| {
+        dirs::document_dir().map(|p| p.join("recorded_audio.wav"))
+    }).unwrap_or_else(|| {
+        env::temp_dir().join("recorded_audio.wav")
+    });
 
-    audio_buffer.export_as_wav(&file_path, sample_rate, 16)
+    println!("Saving to path: {}", file_path.display());
+    
+    let sample_rate = 16000;
+    
+    println!("Using bit depth: {}", bit_depth);
+
+    audio_buffer.export_as_wav(&file_path, sample_rate, bit_depth)
         .map_err(|e| e.to_string())?;
 
     audio_buffer.clear();

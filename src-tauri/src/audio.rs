@@ -13,6 +13,11 @@ impl AudioBuffer {
         }
     }
 
+    pub fn is_empty(&self) -> bool {
+        let data = self.data.lock().unwrap();
+        data.is_empty()
+    }
+
     pub fn clear(&self) {
         let mut data = self.data.lock().unwrap();
         data.clear();
