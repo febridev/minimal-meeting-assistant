@@ -1,6 +1,7 @@
 use tauri::{AppHandle, Manager, State, Emitter};
 use std::path::PathBuf;
 use std::env;
+use std::time::{SystemTime, UNIX_EPOCH};
 use tokio::fs::File;
 use tokio::io::AsyncWriteExt;
 use reqwest;
@@ -102,11 +103,26 @@ async fn stop_recording(
         return Err("No audio was captured. Please ensure your microphone is working and you've granted necessary permissions.".to_string());
     }
     
-    let file_path = save_path.map(PathBuf::from).or_else(|| {
-        dirs::document_dir().map(|p| p.join("recorded_audio.wav"))
-    }).unwrap_or_else(|| {
-        env::temp_dir().join("recorded_audio.wav")
-    });
+    let file_path = {
+        let mut path = save_path.as_ref().map(PathBuf::from).unwrap_or_else(|| {
+            dirs::document_dir()
+                .map(|p| p.join("Meeting-Recordings"))
+                .unwrap_or_else(|| env::temp_dir())
+        });
+
+        if path.is_dir() || save_path.is_none() {
+            if !path.exists() {
+                let _ = std::fs::create_dir_all(&path);
+            }
+            let start = SystemTime::now();
+            let since_the_epoch = start
+                .duration_since(UNIX_EPOCH)
+                .expect("Time went backwards");
+            let timestamp = since_the_epoch.as_secs();
+            path.push(format!("recording_{}.wav", timestamp));
+        }
+        path
+    };
 
     println!("Saving to path: {}", file_path.display());
     
@@ -159,9 +175,7 @@ async fn process_audio(
         Err(e) => Err(format!("Failed to save summary: {}", e)),
     };
 
-    if result.is_ok() {
-        let _ = tokio::fs::remove_file(file_path_buf).await;
-    }
+
 
     result
 }
