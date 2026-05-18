@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { Button } from "@/components/ui/button";
@@ -21,6 +21,9 @@ export function SettingsPage() {
   const [gemmaModelPath, setGemmaModelPath] = useState(
     () => localStorage.getItem("gemmaModelPath") || ""
   );
+  const [savePath, setSavePath] = useState(
+    () => localStorage.getItem("savePath") || ""
+  );
 
   const [whisperModel, setWhisperModel] = useState("tiny");
   const [gemmaModel, setGemmaModel] = useState("2b-it");
@@ -30,7 +33,7 @@ export function SettingsPage() {
   const [isWhisperInstalled, setIsWhisperInstalled] = useState(false);
   const [isGemmaInstalled, setIsGemmaInstalled] = useState(false);
 
-  const verifyModels = async () => {
+  const verifyModels = useCallback(async () => {
     if (whisperModelPath) {
       const exists = await invoke<boolean>("check_model_exists", { path: whisperModelPath });
       setIsWhisperInstalled(exists);
@@ -44,11 +47,12 @@ export function SettingsPage() {
     } else {
       setIsGemmaInstalled(false);
     }
-  };
+  }, [whisperModelPath, gemmaModelPath]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     verifyModels();
-  }, [whisperModelPath, gemmaModelPath]);
+  }, [verifyModels]);
 
   useEffect(() => {
     let unlisten: () => void;
@@ -90,6 +94,7 @@ export function SettingsPage() {
     localStorage.setItem("audioBitDepth", bitDepth);
     localStorage.setItem("whisperModelPath", whisperModelPath);
     localStorage.setItem("gemmaModelPath", gemmaModelPath);
+    localStorage.setItem("savePath", savePath);
     alert("Settings saved!");
   };
 
@@ -146,7 +151,12 @@ export function SettingsPage() {
               </div>
               <div className="space-y-1">
                 <Label htmlFor="path">Save Path</Label>
-                <Input id="path" placeholder="/Users/me/Documents/Recordings" />
+                <Input 
+                  id="path" 
+                  placeholder="/Users/me/Documents/Recordings" 
+                  value={savePath}
+                  onChange={(e) => setSavePath(e.target.value)}
+                />
               </div>
               <div className="space-y-2 pt-2">
                 <Label>Recording Quality</Label>

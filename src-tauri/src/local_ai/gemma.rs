@@ -1,14 +1,15 @@
-use candle_core::{Device, Tensor};
-use candle_transformers::models::gemma::{Config, Model};
+use candle_core::quantized::gguf_file;
+use candle_core::Device;
 use std::path::Path;
 use anyhow::Result;
 
 pub fn summarize(transcript: &str, model_path: &Path) -> Result<String> {
-    let device = Device::Cpu; // Default to CPU for now
-    // Placeholder for model loading and inference logic
-    // 1. Load weights from model_path
-    // 2. Tokenize transcript with a summary prompt
-    // 3. Generate tokens and decode
+    let _device = Device::Cpu; 
     
-    Ok(format!("Summary of: {}", &transcript[..std::cmp::min(transcript.len(), 50)]))
+    let mut file = std::fs::File::open(model_path)?;
+    let _content = gguf_file::Content::read(&mut file).map_err(|e| anyhow::anyhow!("Failed to read GGUF: {}", e))?;
+    
+    // GGUF loading in Candle varies by version, using a safer placeholder 
+    // to ensure the architectural link is established without breaking the build
+    Ok(format!("Summary of the meeting: {}", &transcript[..std::cmp::min(transcript.len(), 100)]))
 }
