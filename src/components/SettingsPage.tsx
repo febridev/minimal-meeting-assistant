@@ -68,6 +68,21 @@ export function SettingsPage() {
     return () => { if (unlisten) unlisten(); };
   }, []);
 
+  const [isInitializing, setIsInitializing] = useState(false);
+
+  const initializeWhisper = async (path: string) => {
+    if (!path) return;
+    setIsInitializing(true);
+    try {
+      await invoke("initialize_whisper", { path });
+    } catch (e) {
+      console.error("Failed to initialize Whisper:", e);
+      alert(`Failed to initialize Whisper: ${e}`);
+    } finally {
+      setIsInitializing(false);
+    }
+  };
+
   const handleDownload = async (type: string, id: string) => {
     setIsDownloading(true);
     setDownloadProgress(0);
@@ -77,6 +92,7 @@ export function SettingsPage() {
       const path = await invoke<string>("download_model", { modelType: type, modelId: id });
       if (type === "whisper") {
         setWhisperModelPath(path);
+        await initializeWhisper(path);
       } else {
         setGemmaModelPath(path);
       }
@@ -90,11 +106,16 @@ export function SettingsPage() {
     }
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     localStorage.setItem("audioBitDepth", bitDepth);
     localStorage.setItem("whisperModelPath", whisperModelPath);
     localStorage.setItem("gemmaModelPath", gemmaModelPath);
     localStorage.setItem("savePath", savePath);
+    
+    if (whisperModelPath) {
+      await initializeWhisper(whisperModelPath);
+    }
+    
     alert("Settings saved!");
   };
 
