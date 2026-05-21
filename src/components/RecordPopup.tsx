@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -19,6 +20,16 @@ export function RecordPopup({ onOpenSettings }: { onOpenSettings: () => void }) 
   const [isTesting, setIsTesting] = useState(false);
   const [status, setStatus] = useState("Ready to record");
 
+  useEffect(() => {
+    const unlisten = listen<string>("processing-status", (event) => {
+      setStatus(event.payload);
+    });
+
+    return () => {
+      unlisten.then((f) => f());
+    };
+  }, []);
+
   const toggleRecording = async () => {
     try {
       if (!isRecording) {
@@ -27,17 +38,29 @@ export function RecordPopup({ onOpenSettings }: { onOpenSettings: () => void }) 
         setStatus("Recording...");
       } else {
         const bitDepth = parseInt(localStorage.getItem("audioBitDepth") || "32");
-        const apiKey = localStorage.getItem("apiKey") || "";
-        const apiUrl = localStorage.getItem("apiUrl") || "";
+
         const savePath = localStorage.getItem("savePath") || "";
-        const result = await invoke("stop_recording", { 
-          bitDepth, 
-          apiKey, 
-          apiUrl, 
-          savePath 
-        });
+        const whisperPath = localStorage.getItem("whisperModelPath") || "";
+        const gemmaPath = localStorage.getItem("gemmaModelPath") || "";
+        
+        const language = localStorage.getItem("transcribeLanguage") || "en";
+        
+        if (!whisperPath || !gemmaPath) {
+          throw new Error("Please configure model paths in Settings first.");
+        }
+
+        setStatus("Audio saved. Starting AI...");
+        const filePath = await invoke<string>("stop_recording", { bitDepth, savePath });
+
         setIsRecording(false);
-        setStatus("Summary saved!");
+        
+        const result = await invoke<string>("process_audio", { 
+          filePath, 
+          whisperPath, 
+          gemmaPath,
+          language
+        });
+        setStatus(result);
         console.log(result);
       }
     } catch (error) {

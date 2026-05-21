@@ -1,9 +1,12 @@
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
+import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import { Progress } from "@/components/ui/progress";
 import { Settings, Sparkles, Info } from "lucide-react";
 import { AboutSection } from "./AboutSection";
 
@@ -12,21 +15,110 @@ export function SettingsPage() {
   const [bitDepth, setBitDepth] = useState(() => {
     return localStorage.getItem("audioBitDepth") || "32";
   });
-  const [apiUrl, setApiUrl] = useState(() => {
-    return localStorage.getItem("apiUrl") || "";
-  });
-  const [apiKey, setApiKey] = useState(() => {
-    return localStorage.getItem("apiKey") || "";
-  });
-  const [savePath, setSavePath] = useState(() => {
-    return localStorage.getItem("savePath") || "";
-  });
 
-  const handleSave = () => {
+  const [whisperModelPath, setWhisperModelPath] = useState(
+    () => localStorage.getItem("whisperModelPath") || ""
+  );
+  const [gemmaModelPath, setGemmaModelPath] = useState(
+    () => localStorage.getItem("gemmaModelPath") || ""
+  );
+  const [savePath, setSavePath] = useState(
+    () => localStorage.getItem("savePath") || ""
+  );
+  const [transcribeLanguage, setTranscribeLanguage] = useState(
+    () => localStorage.getItem("transcribeLanguage") || "en"
+  );
+
+  const [whisperModel, setWhisperModel] = useState("tiny");
+  const [gemmaModel, setGemmaModel] = useState("2b-it");
+  const [isDownloading, setIsDownloading] = useState(false);
+  const [downloadProgress, setDownloadProgress] = useState(0);
+  const [downloadStatus, setDownloadStatus] = useState("");
+  const [isWhisperInstalled, setIsWhisperInstalled] = useState(false);
+  const [isGemmaInstalled, setIsGemmaInstalled] = useState(false);
+
+  const verifyModels = useCallback(async () => {
+    if (whisperModelPath) {
+      const exists = await invoke<boolean>("check_model_exists", { path: whisperModelPath });
+      setIsWhisperInstalled(exists);
+    } else {
+      setIsWhisperInstalled(false);
+    }
+    
+    if (gemmaModelPath) {
+      const exists = await invoke<boolean>("check_model_exists", { path: gemmaModelPath });
+      setIsGemmaInstalled(exists);
+    } else {
+      setIsGemmaInstalled(false);
+    }
+  }, [whisperModelPath, gemmaModelPath]);
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    verifyModels();
+  }, [verifyModels]);
+
+  useEffect(() => {
+    let unlisten: () => void;
+    async function setup() {
+      unlisten = await listen<{ received: number; total: number }>("download-progress", (event) => {
+        const { received, total } = event.payload;
+        if (total) {
+          setDownloadProgress(Math.round((received / total) * 100));
+        }
+      });
+    }
+    setup();
+    return () => { if (unlisten) unlisten(); };
+  }, []);
+
+  const initializeWhisper = async (path: string) => {
+    if (!path) return;
+    try {
+      await invoke("initialize_whisper", { path });
+    } catch (e) {
+      console.error("Failed to initialize Whisper:", e);
+      alert(`Failed to initialize Whisper: ${e}`);
+    }
+  };
+
+  const handleDownload = async (type: string, id: string) => {
+    setIsDownloading(true);
+    setDownloadProgress(0);
+    setDownloadStatus(`Downloading ${type} model...`);
+    
+    try {
+      const path = await invoke<string>("download_model", { modelType: type, modelId: id });
+      if (type === "whisper") {
+        setWhisperModelPath(path);
+        await initializeWhisper(path);
+      } else {
+        setGemmaModelPath(path);
+      }
+      await verifyModels();
+      alert(`Successfully downloaded ${type} model to ${path}`);
+    } catch (e) {
+      alert(`Failed to download: ${e}`);
+    } finally {
+      setIsDownloading(false);
+      setDownloadStatus("");
+    }
+  };
+
+
+  const handleSave = async () => {
     localStorage.setItem("audioBitDepth", bitDepth);
-    localStorage.setItem("apiUrl", apiUrl);
-    localStorage.setItem("apiKey", apiKey);
+
+    localStorage.setItem("whisperModelPath", whisperModelPath);
+    localStorage.setItem("gemmaModelPath", gemmaModelPath);
     localStorage.setItem("savePath", savePath);
+    localStorage.setItem("transcribeLanguage", transcribeLanguage);
+    
+    if (whisperModelPath) {
+      await initializeWhisper(whisperModelPath);
+    }
+    
+
     alert("Settings saved!");
   };
 
@@ -86,8 +178,10 @@ export function SettingsPage() {
                 <Input 
                   id="path" 
                   placeholder="/Users/me/Documents/Recordings" 
-                  value={savePath} 
-                  onChange={(e) => setSavePath(e.target.value)} 
+
+                  value={savePath}
+                  onChange={(e) => setSavePath(e.target.value)}
+
                 />
               </div>
               <div className="space-y-2 pt-2">
@@ -127,34 +221,94 @@ export function SettingsPage() {
 
         {activeSection === "ai" && (
           <div className="space-y-6">
-            <div className="space-y-1">
-              <Label htmlFor="api-url">URL AI API </Label>
-              <Input 
-                id="api-url" 
-                type="text" 
-                placeholder="https://..." 
-                value={apiUrl} 
-                onChange={(e) => setApiUrl(e.target.value)} 
-              />
-              <p className="text-xs text-muted-foreground">
-                Put Your URL API Here.
-              </p>
-            </div>
-            <div className="space-y-1">
-              <Label htmlFor="api-key">OpenAI API Key</Label>
-              <Input 
-                id="api-key" 
-                type="password" 
-                placeholder="sk-..." 
-                value={apiKey} 
-                onChange={(e) => setApiKey(e.target.value)} 
-              />
-              <p className="text-xs text-muted-foreground">
-                Your key is stored locally.
-              </p>
-            </div>
 
-            <Button className="w-full" onClick={handleSave}>Save Changes</Button>
+            <Card className="p-4 space-y-4">
+              <div className="space-y-2">
+                <Label>Whisper Model</Label>
+                <div className="flex items-center gap-2">
+                  <select
+                    value={whisperModel}
+                    onChange={(e) => setWhisperModel(e.target.value)}
+                    className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    <option value="tiny">Tiny (Fastest, Lower Accuracy)</option>
+                    <option value="base">Base (Moderate)</option>
+                    <option value="small">Small (Slower, Higher Accuracy)</option>
+                  </select>
+                  <Button 
+                    onClick={() => handleDownload('whisper', whisperModel)}
+                    disabled={isDownloading || isWhisperInstalled}
+                    variant={isWhisperInstalled ? "outline" : "default"}
+                  >
+                    {isDownloading ? "Downloading..." : isWhisperInstalled ? "Installed" : "Download"}
+                  </Button>
+                </div>
+                <Input
+                  id="whisper-model-path"
+                  type="text"
+                  placeholder="Or enter path to Whisper model"
+                  value={whisperModelPath}
+                  onChange={(e) => setWhisperModelPath(e.target.value)}
+                  disabled={isDownloading}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label>Gemma Model</Label>
+                <div className="flex items-center gap-2">
+                  <select
+                    value={gemmaModel}
+                    onChange={(e) => setGemmaModel(e.target.value)}
+                    disabled={isDownloading}
+                    className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    <option value="2b-it">2B-IT (General Purpose)</option>
+                  </select>
+                  <Button 
+                    onClick={() => handleDownload('gemma', gemmaModel)}
+                    disabled={isDownloading || isGemmaInstalled}
+                    variant={isGemmaInstalled ? "outline" : "default"}
+                  >
+                    {isDownloading ? "Downloading..." : isGemmaInstalled ? "Installed" : "Download"}
+                  </Button>
+                </div>
+                <Input
+                  id="gemma-model-path"
+                  type="text"
+                  placeholder="Or enter path to Gemma model"
+                  value={gemmaModelPath}
+                  onChange={(e) => setGemmaModelPath(e.target.value)}
+                  disabled={isDownloading}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="transcribe-language">Transcription Language</Label>
+                <select
+                  id="transcribe-language"
+                  value={transcribeLanguage}
+                  onChange={(e) => setTranscribeLanguage(e.target.value)}
+                  disabled={isDownloading}
+                  className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <option value="en">English (en)</option>
+                  <option value="id">Indonesian (id)</option>
+                </select>
+                <p className="text-xs text-muted-foreground">Select the language explicitly to prevent C++ auto-detection crashes on macOS.</p>
+              </div>
+              
+              {isDownloading && (
+                <div className="space-y-2">
+                  <p className="text-sm text-muted-foreground">{downloadStatus}</p>
+                  <Progress value={downloadProgress} />
+                </div>
+              )}
+            </Card>
+
+            <Button className="w-full" onClick={handleSave}>
+              Save AI Configuration
+            </Button>
+
           </div>
         )}
 

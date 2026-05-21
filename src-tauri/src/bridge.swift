@@ -24,7 +24,7 @@ class CaptureManager: NSObject, SCStreamDelegate, SCContentSharingPickerObserver
     }
     
     func stop() {
-        stream?.stopCapture()
+        stream?.stopCapture { _ in }
         stream = nil
         audioBuffer = nil
         SCContentSharingPicker.shared.isActive = false
@@ -35,7 +35,7 @@ class CaptureManager: NSObject, SCStreamDelegate, SCContentSharingPickerObserver
     func contentSharingPicker(_ picker: SCContentSharingPicker, didUpdateWith filter: SCContentFilter, for stream: SCStream?) {
         let config = SCStreamConfiguration()
         config.capturesAudio = true
-        config.sampleRate = 48000
+        config.sampleRate = 16000
         config.channelCount = 1
         
         let newStream = SCStream(filter: filter, configuration: config, delegate: self)
