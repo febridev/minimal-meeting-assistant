@@ -157,6 +157,7 @@ async fn process_audio(
     file_path: String,
     whisper_path: String,
     gemma_path: String,
+    language: Option<String>,
 ) -> Result<String, String> {
     let _ = app_handle.emit("processing-status", "Transcribing with Whisper...");
 
@@ -202,7 +203,7 @@ async fn process_audio(
         // Let's perform it while holding the lock for now, or better:
         // WhisperContext is meant to be shared.
         
-        crate::local_ai::whisper::transcribe(&file_path_clone, ctx)
+        crate::local_ai::whisper::transcribe(&file_path_clone, ctx, language.as_deref())
             .map_err(|e| format!("Transcription failed: {}", e))?
     };
 

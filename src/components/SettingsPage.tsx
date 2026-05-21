@@ -24,6 +24,9 @@ export function SettingsPage() {
   const [savePath, setSavePath] = useState(
     () => localStorage.getItem("savePath") || ""
   );
+  const [transcribeLanguage, setTranscribeLanguage] = useState(
+    () => localStorage.getItem("transcribeLanguage") || "en"
+  );
 
   const [whisperModel, setWhisperModel] = useState("tiny");
   const [gemmaModel, setGemmaModel] = useState("2b-it");
@@ -68,18 +71,13 @@ export function SettingsPage() {
     return () => { if (unlisten) unlisten(); };
   }, []);
 
-  const [isInitializing, setIsInitializing] = useState(false);
-
   const initializeWhisper = async (path: string) => {
     if (!path) return;
-    setIsInitializing(true);
     try {
       await invoke("initialize_whisper", { path });
     } catch (e) {
       console.error("Failed to initialize Whisper:", e);
       alert(`Failed to initialize Whisper: ${e}`);
-    } finally {
-      setIsInitializing(false);
     }
   };
 
@@ -111,6 +109,7 @@ export function SettingsPage() {
     localStorage.setItem("whisperModelPath", whisperModelPath);
     localStorage.setItem("gemmaModelPath", gemmaModelPath);
     localStorage.setItem("savePath", savePath);
+    localStorage.setItem("transcribeLanguage", transcribeLanguage);
     
     if (whisperModelPath) {
       await initializeWhisper(whisperModelPath);
@@ -274,6 +273,21 @@ export function SettingsPage() {
                   onChange={(e) => setGemmaModelPath(e.target.value)}
                   disabled={isDownloading}
                 />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="transcribe-language">Transcription Language</Label>
+                <select
+                  id="transcribe-language"
+                  value={transcribeLanguage}
+                  onChange={(e) => setTranscribeLanguage(e.target.value)}
+                  disabled={isDownloading}
+                  className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <option value="en">English (en)</option>
+                  <option value="id">Indonesian (id)</option>
+                </select>
+                <p className="text-xs text-muted-foreground">Select the language explicitly to prevent C++ auto-detection crashes on macOS.</p>
               </div>
               
               {isDownloading && (

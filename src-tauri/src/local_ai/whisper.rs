@@ -2,7 +2,7 @@ use whisper_rs::{FullParams, SamplingStrategy, WhisperContext};
 use std::path::Path;
 use anyhow::Result;
 
-pub fn transcribe(audio_path: &Path, ctx: &WhisperContext) -> Result<String> {
+pub fn transcribe(audio_path: &Path, ctx: &WhisperContext, language: Option<&str>) -> Result<String> {
     // Whisper context is now passed in, not created here.
     let mut state = ctx.create_state().map_err(|e| anyhow::anyhow!("Failed to create state: {}", e))?;
 
@@ -42,10 +42,11 @@ pub fn transcribe(audio_path: &Path, ctx: &WhisperContext) -> Result<String> {
     }
     
     let mut params = FullParams::new(SamplingStrategy::default());
-    params.set_language(Some("auto"));
+    let lang = language.unwrap_or("en");
+    params.set_language(Some(lang));
 
     // Run inference
-    println!("DEBUG: Starting Whisper inference with {} samples (Metal GPU config applied if available)", audio_samples.len());
+    println!("DEBUG: Starting Whisper inference with {} samples (Metal GPU config applied if available, language: {})", audio_samples.len(), lang);
     let res = state.full(params, &audio_samples);
     if let Err(e) = &res {
         eprintln!("ERROR: Whisper inference failed. If using Metal, ensure GPU limits are not exceeded. Details: {:?}", e);

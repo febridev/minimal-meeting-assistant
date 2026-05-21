@@ -42,6 +42,8 @@ export function RecordPopup({ onOpenSettings }: { onOpenSettings: () => void }) 
         const whisperPath = localStorage.getItem("whisperModelPath") || "";
         const gemmaPath = localStorage.getItem("gemmaModelPath") || "";
         
+        const language = localStorage.getItem("transcribeLanguage") || "en";
+        
         if (!whisperPath || !gemmaPath) {
           throw new Error("Please configure model paths in Settings first.");
         }
@@ -53,7 +55,8 @@ export function RecordPopup({ onOpenSettings }: { onOpenSettings: () => void }) 
         const result = await invoke<string>("process_audio", { 
           filePath, 
           whisperPath, 
-          gemmaPath 
+          gemmaPath,
+          language
         });
         setStatus(result);
         console.log(result);
