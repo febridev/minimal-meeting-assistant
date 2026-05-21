@@ -15,6 +15,7 @@ export function SettingsPage() {
   const [bitDepth, setBitDepth] = useState(() => {
     return localStorage.getItem("audioBitDepth") || "32";
   });
+
   const [whisperModelPath, setWhisperModelPath] = useState(
     () => localStorage.getItem("whisperModelPath") || ""
   );
@@ -104,8 +105,10 @@ export function SettingsPage() {
     }
   };
 
+
   const handleSave = async () => {
     localStorage.setItem("audioBitDepth", bitDepth);
+
     localStorage.setItem("whisperModelPath", whisperModelPath);
     localStorage.setItem("gemmaModelPath", gemmaModelPath);
     localStorage.setItem("savePath", savePath);
@@ -115,6 +118,7 @@ export function SettingsPage() {
       await initializeWhisper(whisperModelPath);
     }
     
+
     alert("Settings saved!");
   };
 
@@ -174,8 +178,10 @@ export function SettingsPage() {
                 <Input 
                   id="path" 
                   placeholder="/Users/me/Documents/Recordings" 
+
                   value={savePath}
                   onChange={(e) => setSavePath(e.target.value)}
+
                 />
               </div>
               <div className="space-y-2 pt-2">
@@ -215,6 +221,7 @@ export function SettingsPage() {
 
         {activeSection === "ai" && (
           <div className="space-y-6">
+
             <Card className="p-4 space-y-4">
               <div className="space-y-2">
                 <Label>Whisper Model</Label>
@@ -301,6 +308,7 @@ export function SettingsPage() {
             <Button className="w-full" onClick={handleSave}>
               Save AI Configuration
             </Button>
+
           </div>
         )}
 

@@ -38,6 +38,7 @@ export function RecordPopup({ onOpenSettings }: { onOpenSettings: () => void }) 
         setStatus("Recording...");
       } else {
         const bitDepth = parseInt(localStorage.getItem("audioBitDepth") || "32");
+
         const savePath = localStorage.getItem("savePath") || "";
         const whisperPath = localStorage.getItem("whisperModelPath") || "";
         const gemmaPath = localStorage.getItem("gemmaModelPath") || "";
@@ -50,6 +51,7 @@ export function RecordPopup({ onOpenSettings }: { onOpenSettings: () => void }) 
 
         setStatus("Audio saved. Starting AI...");
         const filePath = await invoke<string>("stop_recording", { bitDepth, savePath });
+
         setIsRecording(false);
         
         const result = await invoke<string>("process_audio", { 

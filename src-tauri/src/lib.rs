@@ -91,9 +91,11 @@ async fn debug_save_to_desktop(audio_buffer: State<'_, AudioBuffer>, bit_depth: 
 
 #[tauri::command]
 async fn stop_recording(
+
     audio_buffer: State<'_, AudioBuffer>,
     bit_depth: u16,
     save_path: Option<String>,
+
 ) -> Result<String, String> {
     #[cfg(target_os = "macos")]
     unsafe {
@@ -136,6 +138,7 @@ async fn stop_recording(
     audio_buffer.export_as_wav(&file_path, sample_rate, bit_depth)
         .map_err(|e| e.to_string())?;
 
+
     audio_buffer.clear();
 
     Ok(file_path.to_string_lossy().to_string())
@@ -174,6 +177,7 @@ async fn process_audio(
                 .map_err(|e| format!("Failed to load context: {}", e))?;
             *ctx_lock = Some(ctx);
         }
+
     }
 
     let file_path_clone = file_path_buf.clone();
